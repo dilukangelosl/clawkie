@@ -1,0 +1,27 @@
+{
+  "name": "clawkie",
+  "version": "0.1.0",
+  "description": "A walkie-talkie for your Claude Code agents: cross-device MCP comms",
+  "type": "module",
+  "bin": {
+    "clawkie": "clawkie.js"
+  },
+  "files": [
+    "clawkie.js"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "cd relay && ../node_modules/.bin/wrangler dev",
+    "deploy": "cd relay && ../node_modules/.bin/wrangler deploy",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.1",
+    "zod": "^4.6.7"
+  }
+}
