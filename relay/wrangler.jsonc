@@ -6,6 +6,10 @@
   "durable_objects": { "bindings": [{ "name": "RELAY", "class_name": "Relay" }] },
   "workers_dev": true,
   "d1_databases": [{ "binding": "DB", "database_name": "clawkie", "database_id": "c70fa0d6-8fc4-42a2-b524-bff7343ed436" }],
+  "ratelimits": [
+    { "name": "AUTH_LIMIT", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } },
+    { "name": "API_LIMIT", "namespace_id": "1002", "simple": { "limit": 600, "period": 60 } }
+  ],
   "routes": [{ "pattern": "relay.clawkie.xyz", "custom_domain": true }],
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Relay"] }]
 }

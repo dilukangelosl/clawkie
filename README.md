@@ -82,12 +82,12 @@ In a session, ask Claude: **"clawkie whoami"**. You should see this session's na
 Example: your laptop session drives a VM session that runs a Subsquid server.
 
 1. **Laptop**, in Claude Code:
-   > clawkie invite
+   > /clawkie:invite
 
-   Claude shows something like `brave-otter · 482913`. The code is valid for 10 minutes and works once.
+   Claude shows an invite like `brave-otter Xk3fQ9pL2vR8tY1wZ4nM6a`. It works once, expires in 10 minutes, and works like a password.
 
 2. **VM**, in Claude Code:
-   > clawkie join brave-otter 482913
+   > /clawkie:join brave-otter Xk3fQ9pL2vR8tY1wZ4nM6a
 
    Both sessions are now in one group. The laptop session gets a "rusty-falcon paired with your group" event.
 
@@ -100,7 +100,7 @@ Example: your laptop session drives a VM session that runs a Subsquid server.
 
 5. **Laptop**: the result arrives, and Claude can verify it straight away.
 
-To add a third session (another machine, another terminal), pair it with **any** session already in the group. Groups merge automatically.
+To add a third session (another machine, another terminal), make an invite from **any** session already in the group and join with it. Only the joining session moves: if it was in another group, it leaves that one.
 
 ## Everyday use
 
@@ -108,8 +108,8 @@ Talk to Claude normally. These phrases work well:
 
 | You say | What happens |
 | :- | :- |
-| "clawkie invite" | New pairing code for this session |
-| "clawkie join brave-otter 482913" | Pair with another session |
+| "clawkie invite" | New invite for this session |
+| "clawkie join brave-otter Xk3f…" | Join with an invite |
 | "who's online on clawkie?" / "clawkie peers" | Peers, their status line, online or not |
 | "send this to rusty-falcon: …" / "ask the VM to …" | Sends a prompt to a peer |
 | "tell everyone …" | Sends to `all` peers |
@@ -127,8 +127,8 @@ With the plugin installed, type `/clawkie:` to see them all.
 
 | Command | Does |
 | :- | :- |
-| `/clawkie:invite` | Pairing code for this session (`brave-otter 482913`) |
-| `/clawkie:join <name> <code>` | Pair with another session |
+| `/clawkie:invite` | One-time invite for this session (`brave-otter Xk3f…`) |
+| `/clawkie:join <name> <secret>` | Join a group with an invite |
 | `/clawkie:peers` | Who's paired, online, and what they're doing |
 | `/clawkie:whoami` | This session's name, mode, relay |
 | `/clawkie:delegate <name\|all> <task>` | Hand a task to a peer as a self-contained prompt; they report back |
@@ -140,6 +140,7 @@ With the plugin installed, type `/clawkie:` to see them all.
 | `/clawkie:notes` | Show shared notes |
 | `/clawkie:forget <id>` | Delete a shared note |
 | `/clawkie:handoff [notes]` | Save a summary of this session's work for whoever picks it up next |
+| `/clawkie:kick <name>` | Remove a lost or compromised session from the group |
 | `/clawkie:leave` | Unpair this session |
 
 ## Memory: history, notes, handoffs
@@ -150,7 +151,7 @@ Stored in Cloudflare D1, per group, and shown to every session when it starts.
 - **Shared notes:** a group notepad for lasting facts like *"squid graphql runs on vm:4350"* or *"never run migrations on prod without a backup"*. Claude saves things here when it learns them (or use `/clawkie:remember`). Every session sees all notes at startup.
 - **Handoffs:** each session's latest summary of its work. At the end of every turn, Claude's last reply is saved automatically (if it's more than a one-liner). `/clawkie:handoff` writes a proper one. When you open a new session in the same folder, it's told *"YOU (last session in this folder): …"* and picks up where you left off; peers see it too.
 
-Joining a group brings your history, notes, and handoffs along. Leaving takes only your handoff with you.
+Everything is end-to-end encrypted (see [Security](#security)). When a session joins a group, only its handoff comes along; history and notes stay with the group they were written in.
 
 ## Modes: ask vs auto
 
@@ -188,8 +189,8 @@ The rules Claude follows:
 | Tool | Arguments | Does |
 | :- | :- | :- |
 | `clawkie_whoami` | none | This session's name, mode, peers |
-| `clawkie_invite` | none | One-time 6-digit pairing code, valid 10 min |
-| `clawkie_join` | `name`, `code` | Join the group of session `name` |
+| `clawkie_invite` | none | One-time invite (`name secret`), valid 10 min |
+| `clawkie_join` | `invite` | Join the group of the inviting session |
 | `clawkie_send` | `to` (name or `all`), `text` | Send a message or prompt |
 | `clawkie_status` | `text` | Set this session's one-line status |
 | `clawkie_peers` | none | Peers with status, last seen, online |
@@ -199,6 +200,7 @@ The rules Claude follows:
 | `clawkie_notes` | none | List shared notes |
 | `clawkie_forget` | `id` | Delete a shared note |
 | `clawkie_handoff` | `summary` | Save this session's handoff |
+| `clawkie_kick` | `name` | Remove a peer from the group |
 | `clawkie_leave` | none | Leave the group |
 
 ## Session names and identity
@@ -210,13 +212,38 @@ The rules Claude follows:
 
 ## Security
 
-- Each session has a random secret token; the relay stores only its SHA-256 hash.
-- Pairing needs the session name **and** a 6-digit code that expires in 10 minutes, works once, and is destroyed after 5 wrong tries.
-- Messages only go between sessions in the same group.
-- The delivery queue holds a message only until the receiver acknowledges it. A copy is kept in the group's **history** (D1), readable only by sessions in that group.
-- Notes and handoffs are visible to everyone in the group. Don't put secrets in them.
-- Messages from peers are requests, not commands: ask mode (the default) puts you in the loop for every one.
-- Don't pair sessions you don't control. Anyone in your group can send prompts to your sessions.
+Clawkie is built so that **nobody outside your group, including whoever runs the relay, can read your sessions' traffic or inject anything into them.**
+
+**End-to-end encryption.** Every group has a random AES-256-GCM key that exists only on its machines (`~/.clawkie/`, mode 600). Messages, shared notes, handoffs, and status lines are encrypted before they leave your machine. The relay (the Cloudflare Worker, the Durable Object, D1) only ever stores and forwards ciphertext, and it rejects anything that isn't encrypted.
+
+**Pairing can't be guessed.** An invite is `name secret`, where the secret is 128 random bits generated on your machine. The secret never reaches the relay. The relay only holds:
+- the group key, wrapped (encrypted) with a key derived from the secret, which it can't open;
+- the SHA-256 hash of a second value derived from the secret, which the joiner must present.
+
+So joining needs the full secret: there is nothing to brute-force. Invites are single use, expire after 10 minutes, and are destroyed after 5 wrong attempts.
+
+**No injection from outside the group.** Every incoming message is checked before Claude sees it:
+- it must decrypt with your group key (AES-GCM is authenticated, so it can't be forged or altered);
+- the sender and recipient sealed *inside* it must match who the relay says sent it, so the relay can't relabel or re-target messages;
+- it must be under 7 days old.
+
+Anything that fails is dropped, and Claude only gets a notice: *"Dropped a message claiming to be from X"*. History entries that fail show as `[unreadable…]`, and Claude is told to ignore them.
+
+**Isolation between users.** Every relay endpoint is scoped to the caller's group: you can't list, message, read history or notes of, or kick sessions outside your own group. Session tokens are random, and the relay stores only their SHA-256 hash.
+
+**Secret masking.** Before anything is encrypted and sent (messages, notes, handoffs, statuses, including the automatic end-of-turn handoff), well-known credential formats are replaced with `[REDACTED]`: Anthropic/OpenAI `sk-…`, GitHub `ghp_…`/`github_pat_…`, npm `npm_…`, AWS `AKIA…`, Slack `xox…`, Google `AIza…`, JWTs, and PEM private keys. This is a safety net, not a guarantee: a secret without a recognizable shape (a wallet private key, a random password) still goes through, encrypted, to your own peers. Claude is told never to send secrets to peers.
+
+**You stay in control.** In **ask** mode (the default), Claude asks before acting on any peer request. The mode can only be changed by you (`/config` or env), never by a tool or a message.
+
+**Lost or compromised device:** `/clawkie:kick <name>` from any other session removes it from the group and deletes its queued messages and handoff. The kicked device still knows the old group key: if you're worried it was compromised, have every remaining session run `/clawkie:leave`, then pair again from scratch so a fresh key is created.
+
+**Abuse limits.** Per-IP rate limits (20/min for register, invite, and join; 600/min overall), a 256 KB request size cap, and per-field size caps.
+
+**Transport.** HTTPS/WSS only. The client refuses a non-HTTPS relay URL (except `localhost` for development). Tokens go in headers, never in URLs.
+
+**What the relay can still see:** session names, which sessions are paired, when messages are sent and how big they are, and IP addresses. Not their content.
+
+**Upgrading from 0.3 or earlier:** older messages and notes were stored unencrypted and show as `[unreadable…]`. Re-pair your sessions with new invites (`/clawkie:invite`, then `/clawkie:join`).
 
 ## Troubleshooting
 
@@ -225,7 +252,10 @@ The rules Claude follows:
 | Messages don't pop up in the session | Start Claude Code with `--dangerously-load-development-channels plugin:clawkie@clawkie` (or `server:clawkie`). Meanwhile, "check the clawkie inbox" works. |
 | "blocked by org policy" | Your Team/Enterprise admin must enable channels. |
 | `/mcp` shows clawkie as failed | Check `node -v` is 22+. Run `claude --debug …` and read `~/.claude/debug/<session-id>.txt`. |
-| "no active invite for that session" | The code expired, was used, or got 5 wrong tries. Run "clawkie invite" again. |
+| "no active invite for that session" | The invite expired, was used, or got 5 wrong tries. Make a new one with `/clawkie:invite`. |
+| "wrong invite secret" | Copy the whole invite, both parts. |
+| Messages show `[unreadable…]` | Sent before 0.4, or by a session with a different group key. Re-pair. |
+| "rate limited" | Too many joins/invites from your IP in a minute. Wait a minute. |
 | "unknown peer" | Not paired yet, or a typo. Run "clawkie peers". |
 | Both sessions have the same name | Same working folder. Use `CLAWKIE_ID` (see above). |
 | Relay unreachable | `curl https://clawkie-relay.casineo.workers.dev` should return `{"ok":true,"service":"clawkie-relay"}`. Behind a proxy, allow HTTPS and WebSockets to that host. |
@@ -250,7 +280,7 @@ Claude Code ──stdio──▶ clawkie.js ──HTTPS + WebSocket──▶ rel
 - **`relay/`**: Cloudflare Worker with one SQLite-backed Durable Object (sessions with hashed tokens, groups, invites, the live delivery queue, WebSockets) and a D1 database (message history, shared notes, handoffs). Tables are created automatically on first run.
 - **`.claude-plugin/`, `hooks/`**: plugin manifest, marketplace entry, and hook wiring.
 
-Relay API (all `POST`, `Authorization: Bearer <token>` except `/register`): `/register`, `/whoami`, `/context`, `/peers`, `/status`, `/invite`, `/join`, `/leave`, `/send`, `/history`, `/remember`, `/notes`, `/forget`, `/handoff`. `GET /ws` (WebSocket) pushes `message`, `joined`, and `left` events; the client acks each message.
+Relay API (all `POST`, `Authorization: Bearer <token>` except `/register`): `/register`, `/whoami`, `/context`, `/peers`, `/status`, `/invite`, `/join`, `/leave`, `/kick`, `/send`, `/history`, `/remember`, `/notes`, `/forget`, `/handoff`. Content fields must be client-side ciphertext (`e1:` + base64url of IV, GCM tag, ciphertext). `GET /ws` (WebSocket) pushes `message`, `joined`, and `left` events; the client acks each message.
 
 ## Self-host the relay
 

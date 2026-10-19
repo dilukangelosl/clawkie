@@ -1,7 +1,7 @@
 {
   "name": "clawkie",
   "displayName": "Clawkie",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A walkie-talkie for your Claude Code agents: sessions on different machines pair up and pass prompts, results and status.",
   "author": {
     "name": "Diluk Angelo"
@@ -40,13 +40,13 @@
   },
   "commands": {
     "invite": {
-      "description": "Get a pairing code so another session can join this one",
-      "content": "Call clawkie_invite and show me the session name and code in one line I can copy, like: `brave-otter 482913`. Mention it expires in 10 minutes."
+      "description": "Create a one-time invite so another session can join this group",
+      "content": "Call clawkie_invite and show me the invite on its own line so I can copy it, like: `brave-otter Xk3fQ9...`. Say it is single use, expires in 10 minutes, and works like a password: only paste it into my own sessions."
     },
     "join": {
-      "description": "Pair with another session",
-      "content": "Pair with another Clawkie session using clawkie_join. Arguments (name then code): $ARGUMENTS. If either is missing, ask me for it. Then list who is now in the group.",
-      "argumentHint": "<name> <code>"
+      "description": "Join another session's group with its invite",
+      "argumentHint": "<name> <secret>",
+      "content": "Join a Clawkie group with clawkie_join, using this invite: $ARGUMENTS. If it is missing, ask me for it. Then list who is now in the group."
     },
     "peers": {
       "description": "Who is paired, online, and what they are doing",
@@ -102,6 +102,11 @@
     "leave": {
       "description": "Unpair this session from its group",
       "content": "Confirm with me, then call clawkie_leave."
+    },
+    "kick": {
+      "description": "Remove a lost or compromised session from the group",
+      "argumentHint": "<name>",
+      "content": "Remove Clawkie session $ARGUMENTS from the group with clawkie_kick. If no name is given, show the peers and ask which one. Confirm with me before kicking."
     }
   }
 }

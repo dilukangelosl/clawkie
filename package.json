@@ -1,6 +1,6 @@
 {
   "name": "clawkie",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A walkie-talkie for your Claude Code agents: cross-device MCP comms",
   "type": "module",
   "bin": {
