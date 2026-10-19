@@ -1,27 +1,107 @@
 {
   "name": "clawkie",
   "displayName": "Clawkie",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "A walkie-talkie for your Claude Code agents: sessions on different machines pair up and pass prompts, results and status.",
-  "author": { "name": "Diluk Angelo" },
+  "author": {
+    "name": "Diluk Angelo"
+  },
   "homepage": "https://clawkie.xyz",
   "repository": "https://github.com/dilukangelosl/clawkie",
   "license": "MIT",
   "mcpServers": {
     "clawkie": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/clawkie.js"],
-      "env": { "CLAWKIE_MODE": "${user_config.mode}" }
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/clawkie.js"
+      ],
+      "env": {
+        "CLAWKIE_MODE": "${user_config.mode}"
+      }
     }
   },
-  "channels": [{ "server": "clawkie", "displayName": "Clawkie" }],
+  "channels": [
+    {
+      "server": "clawkie",
+      "displayName": "Clawkie"
+    }
+  ],
   "userConfig": {
     "mode": {
       "type": "string",
       "title": "Mode",
       "description": "ask: confirm with you before acting on a peer's request. auto: act right away.",
-      "options": ["ask", "auto"],
+      "options": [
+        "ask",
+        "auto"
+      ],
       "default": "ask"
+    }
+  },
+  "commands": {
+    "invite": {
+      "description": "Get a pairing code so another session can join this one",
+      "content": "Call clawkie_invite and show me the session name and code in one line I can copy, like: `brave-otter 482913`. Mention it expires in 10 minutes."
+    },
+    "join": {
+      "description": "Pair with another session",
+      "content": "Pair with another Clawkie session using clawkie_join. Arguments (name then code): $ARGUMENTS. If either is missing, ask me for it. Then list who is now in the group.",
+      "argumentHint": "<name> <code>"
+    },
+    "peers": {
+      "description": "Who is paired, online, and what they are doing",
+      "content": "Call clawkie_peers and show a compact table: name, online/offline, last seen, status."
+    },
+    "whoami": {
+      "description": "This session's Clawkie name, mode, and relay",
+      "content": "Call clawkie_whoami and show it briefly."
+    },
+    "send": {
+      "description": "Send a message to a peer session",
+      "content": "Send a Clawkie message with clawkie_send. Arguments: $ARGUMENTS. The first word is the recipient (a session name or \"all\"), the rest is the message. If it is missing, ask me.",
+      "argumentHint": "<name|all> <message>"
+    },
+    "delegate": {
+      "description": "Hand a task to another session and get the result back",
+      "content": "Delegate this task to Clawkie session(s) via clawkie_send: $ARGUMENTS\nThe first word is the recipient (session name or \"all\"); the rest is the task. Write a self-contained prompt they can act on without seeing this conversation: goal, relevant paths, commands, constraints, what \"done\" looks like, and ask them to reply with results and anything I should verify. Show me the prompt you sent.",
+      "argumentHint": "<name|all> <task>"
+    },
+    "status": {
+      "description": "Set this session's status line",
+      "content": "Set this session's Clawkie status with clawkie_status. If arguments are given use them: $ARGUMENTS. Otherwise write a one-line summary of what this session is doing now.",
+      "argumentHint": "[status]"
+    },
+    "inbox": {
+      "description": "Check for new messages manually",
+      "content": "Call clawkie_inbox and show any messages. Handle each one following the Clawkie rules for this session's mode."
+    },
+    "history": {
+      "description": "Show past messages between sessions",
+      "content": "Call clawkie_history (limit 30; if a session name is given, filter to it: $ARGUMENTS) and show it as a readable thread with relative times.",
+      "argumentHint": "[name]"
+    },
+    "remember": {
+      "description": "Save a fact to the group's shared notes",
+      "content": "Save this to Clawkie shared notes with clawkie_remember: $ARGUMENTS\nIf no arguments, pick the most useful lasting fact from this conversation (a port, path, host, decision, or gotcha) and confirm it with me first.",
+      "argumentHint": "[fact]"
+    },
+    "notes": {
+      "description": "Show the group's shared notes",
+      "content": "Call clawkie_notes and list them with ids, newest first."
+    },
+    "forget": {
+      "description": "Delete a shared note",
+      "content": "Delete Clawkie shared note(s) with clawkie_forget. Arguments: $ARGUMENTS. If no id is given, show the notes and ask which one.",
+      "argumentHint": "<id>"
+    },
+    "handoff": {
+      "description": "Save a handoff summary of this session",
+      "content": "Write a handoff for this session: what was done, what is in progress, next steps, and gotchas. Keep it under 20 lines. Extra notes from me: $ARGUMENTS\nSave it with clawkie_handoff and also update clawkie_status.",
+      "argumentHint": "[notes]"
+    },
+    "leave": {
+      "description": "Unpair this session from its group",
+      "content": "Confirm with me, then call clawkie_leave."
     }
   }
 }

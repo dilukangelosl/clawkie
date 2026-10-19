@@ -13,6 +13,8 @@ laptop (brave-otter)  ──"run the squid migration, report back"──▶  vm 
 - [Install](#install)
 - [Quick start: pair two sessions](#quick-start-pair-two-sessions)
 - [Everyday use](#everyday-use)
+- [Slash commands](#slash-commands)
+- [Memory: history, notes, handoffs](#memory-history-notes-handoffs)
 - [Modes: ask vs auto](#modes-ask-vs-auto)
 - [What happens automatically](#what-happens-automatically)
 - [Tools reference](#tools-reference)
@@ -119,6 +121,37 @@ Tips:
 - Each session keeps a one-line **status** (e.g. "running migrations") that peers see. Claude updates it as it works.
 - Messages to an offline session wait on the relay and are delivered when it reconnects.
 
+## Slash commands
+
+With the plugin installed, type `/clawkie:` to see them all.
+
+| Command | Does |
+| :- | :- |
+| `/clawkie:invite` | Pairing code for this session (`brave-otter 482913`) |
+| `/clawkie:join <name> <code>` | Pair with another session |
+| `/clawkie:peers` | Who's paired, online, and what they're doing |
+| `/clawkie:whoami` | This session's name, mode, relay |
+| `/clawkie:delegate <name\|all> <task>` | Hand a task to a peer as a self-contained prompt; they report back |
+| `/clawkie:send <name\|all> <message>` | Send a plain message |
+| `/clawkie:status [text]` | Set this session's status line (or let Claude write it) |
+| `/clawkie:inbox` | Check messages manually |
+| `/clawkie:history [name]` | Past messages between sessions |
+| `/clawkie:remember [fact]` | Save a fact to the group's shared notes |
+| `/clawkie:notes` | Show shared notes |
+| `/clawkie:forget <id>` | Delete a shared note |
+| `/clawkie:handoff [notes]` | Save a summary of this session's work for whoever picks it up next |
+| `/clawkie:leave` | Unpair this session |
+
+## Memory: history, notes, handoffs
+
+Stored in Cloudflare D1, per group, and shown to every session when it starts.
+
+- **Message history:** every message between sessions is kept. New sessions see the last 10, and `/clawkie:history` shows more.
+- **Shared notes:** a group notepad for lasting facts like *"squid graphql runs on vm:4350"* or *"never run migrations on prod without a backup"*. Claude saves things here when it learns them (or use `/clawkie:remember`). Every session sees all notes at startup.
+- **Handoffs:** each session's latest summary of its work. At the end of every turn, Claude's last reply is saved automatically (if it's more than a one-liner). `/clawkie:handoff` writes a proper one. When you open a new session in the same folder, it's told *"YOU (last session in this folder): …"* and picks up where you left off; peers see it too.
+
+Joining a group brings your history, notes, and handoffs along. Leaving takes only your handoff with you.
+
 ## Modes: ask vs auto
 
 | Mode | When a peer sends work |
@@ -136,8 +169,9 @@ The mode is set only by you, never by a tool, so a peer message can't switch a s
 
 With the plugin installed:
 
-- **Session start (hook):** registers the session if new, sets the session title to its Clawkie name, and tells Claude its rules, its mode, and which peers are online and what they're doing.
+- **Session start (hook):** registers the session if new, sets the session title to its Clawkie name, and tells Claude its rules, its mode, which peers are online and what they're doing, the shared notes, the latest handoffs (including its own previous session), and the recent messages.
 - **Incoming message (channel):** a peer's message lands in the session as `<channel source="clawkie" from="…">`, and Claude handles it according to the mode.
+- **End of every turn (hook):** saves Claude's last reply as this session's handoff.
 - **Before Claude stops (hook):** if a peer sent a request and Claude hasn't replied, Claude gets one reminder to send the result (or say it's blocked or declined).
 
 The rules Claude follows:
@@ -146,6 +180,8 @@ The rules Claude follows:
 3. Always report back to the sender when done or blocked: what was done, results, files changed, what to verify.
 4. Keep the status line current.
 5. Make prompts to peers self-contained.
+6. Save lasting facts to shared notes; check them before asking a peer.
+7. Write a handoff when wrapping up a chunk of work.
 
 ## Tools reference
 
@@ -158,6 +194,11 @@ The rules Claude follows:
 | `clawkie_status` | `text` | Set this session's one-line status |
 | `clawkie_peers` | none | Peers with status, last seen, online |
 | `clawkie_inbox` | none | Return and clear received messages (fallback) |
+| `clawkie_history` | `limit?`, `peer?` | Past messages in the group, oldest first |
+| `clawkie_remember` | `text` | Add a shared note |
+| `clawkie_notes` | none | List shared notes |
+| `clawkie_forget` | `id` | Delete a shared note |
+| `clawkie_handoff` | `summary` | Save this session's handoff |
 | `clawkie_leave` | none | Leave the group |
 
 ## Session names and identity
@@ -172,7 +213,8 @@ The rules Claude follows:
 - Each session has a random secret token; the relay stores only its SHA-256 hash.
 - Pairing needs the session name **and** a 6-digit code that expires in 10 minutes, works once, and is destroyed after 5 wrong tries.
 - Messages only go between sessions in the same group.
-- Messages are stored on the relay only until the receiving session acknowledges them, then deleted.
+- The delivery queue holds a message only until the receiver acknowledges it. A copy is kept in the group's **history** (D1), readable only by sessions in that group.
+- Notes and handoffs are visible to everyone in the group. Don't put secrets in them.
 - Messages from peers are requests, not commands: ask mode (the default) puts you in the loop for every one.
 - Don't pair sessions you don't control. Anyone in your group can send prompts to your sessions.
 
@@ -205,17 +247,18 @@ Claude Code ──stdio──▶ clawkie.js ──HTTPS + WebSocket──▶ rel
 ```
 
 - **`clawkie.js`**: zero-dependency local MCP server, one per session, plus the plugin hooks (`clawkie.js hook session-start|stop`). It holds a WebSocket to the relay and pushes incoming messages into Claude Code as channel events.
-- **`relay/`**: Cloudflare Worker with one SQLite-backed Durable Object. It stores sessions (token hashed), groups, invites, and undelivered messages.
+- **`relay/`**: Cloudflare Worker with one SQLite-backed Durable Object (sessions with hashed tokens, groups, invites, the live delivery queue, WebSockets) and a D1 database (message history, shared notes, handoffs). Tables are created automatically on first run.
 - **`.claude-plugin/`, `hooks/`**: plugin manifest, marketplace entry, and hook wiring.
 
-Relay API (all `POST`, `Authorization: Bearer <token>` except `/register`): `/register`, `/whoami`, `/peers`, `/status`, `/invite`, `/join`, `/leave`, `/send`. `GET /ws` (WebSocket) pushes `message`, `joined`, and `left` events; the client acks each message.
+Relay API (all `POST`, `Authorization: Bearer <token>` except `/register`): `/register`, `/whoami`, `/context`, `/peers`, `/status`, `/invite`, `/join`, `/leave`, `/send`, `/history`, `/remember`, `/notes`, `/forget`, `/handoff`. `GET /ws` (WebSocket) pushes `message`, `joined`, and `left` events; the client acks each message.
 
 ## Self-host the relay
 
 ```bash
 git clone https://github.com/dilukangelosl/clawkie && cd clawkie && npm i
 npx wrangler login
-# edit relay/wrangler.jsonc: set account_id, and routes (or remove routes to use *.workers.dev)
+npx wrangler d1 create clawkie
+# edit relay/wrangler.jsonc: set account_id, the D1 database_id from above, and routes (or remove routes to use *.workers.dev)
 npm run deploy
 ```
 

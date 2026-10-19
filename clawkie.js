@@ -65,6 +65,9 @@ ${MODE === 'ask'
 - When you finish (or get blocked on) work a peer asked for, ALWAYS reply with clawkie_send: what you did, results, files changed, what they should verify.
 - Keep clawkie_status current with a one-line summary when you start and finish meaningful work.
 - To hand work to another session, clawkie_send a self-contained prompt; they can't see this conversation.
+- Shared notes: when you learn a lasting fact other sessions will need (ports, paths, hosts, decisions, gotchas), save it with clawkie_remember. Check the notes before asking a peer something.
+- Handoff: when you wrap up a chunk of work, save a short summary with clawkie_handoff (done, in progress, next steps). Your last reply each turn is also saved as a fallback handoff.
+- Earlier messages between sessions: clawkie_history.
 - Pairing: clawkie_invite gives this session's name + a 6-digit code for the user to pass to another session, which calls clawkie_join.`
 
 // ---------- hooks ----------
@@ -75,16 +78,25 @@ if (process.argv[2] === 'hook') {
   try {
     if (process.argv[3] === 'session-start') {
       const me = await identity(cwd)
-      const { peers } = await api('/peers', {}, me.token)
-      const list = peers.length
-        ? peers.map(p => `  - ${p.name} (${p.online ? 'online' : 'offline'}${p.status ? `: ${p.status}` : ''})`).join('\n')
-        : '  (none yet. If the user wants to connect another session, run clawkie_invite.)'
-      out({ hookSpecificOutput: {
-        hookEventName: 'SessionStart',
-        sessionTitle: me.name,
-        additionalContext: `You are Clawkie session "${me.name}" (${MODE} mode).\nPaired sessions:\n${list}\n\n${RULES}`,
-      } })
+      const ctx = await api('/context', { limit: 10 }, me.token)
+      const cut = (t, n) => (t.length > n ? t.slice(0, n) + '…' : t)
+      const ago = ts => `${Math.round((Date.now() - ts) / 60000)}m ago`
+      const section = (title, items, empty) => `${title}:\n${items.length ? items.join('\n') : `  ${empty}`}`
+      const context = [
+        `You are Clawkie session "${me.name}" (${MODE} mode).`,
+        section('Paired sessions', ctx.peers.map(p => `  - ${p.name} (${p.online ? 'online' : 'offline'}${p.status ? `: ${p.status}` : ''})`),
+          '(none yet. If the user wants to connect another session, run clawkie_invite.)'),
+        section('Shared notes', ctx.notes.map(n => `  - [${n.id}] ${cut(n.text, 400)} (${n.author})`), '(none)'),
+        section('Latest handoffs', ctx.handoffs.map(h => `  - ${h.name === me.name ? 'YOU (last session in this folder)' : h.name}, ${ago(h.ts)}: ${cut(h.summary, 800)}`), '(none)'),
+        section('Recent messages', ctx.history.map(m => `  - ${m.from_name} → ${m.to_name}, ${ago(m.ts)}: ${cut(m.text, 300)}`), '(none)'),
+        RULES,
+      ].join('\n\n')
+      out({ hookSpecificOutput: { hookEventName: 'SessionStart', sessionTitle: me.name, additionalContext: context } })
     } else if (process.argv[3] === 'stop' && !input.stop_hook_active) {
+      // Fallback handoff: the last reply of a turn is usually a summary of what was done.
+      // ponytail: skips short replies (<80 chars) as a cheap "was this real work" check
+      const last = input.last_assistant_message ?? ''
+      if (last.length >= 80) await api('/handoff', { summary: last }, (await identity(cwd)).token).catch(e => log(e.message))
       const { pending } = paths(cwd)
       const waiting = Object.keys(readPending(pending))
       if (waiting.length) {
@@ -129,25 +141,31 @@ function push(content, meta) {
 }
 
 const str = d => ({ type: 'string', description: d })
+const call = async (path, args = {}) => api(path, args, (await getMe()).token)
 const tools = {
-  clawkie_whoami: { d: 'Show this session\'s Clawkie name, mode, and paired sessions.', p: {}, run: async () => ({ mode: MODE, relay: RELAY, ...(await api('/whoami', {}, (await getMe()).token)) }) },
-  clawkie_invite: { d: 'Create a one-time 6-digit pairing code (valid 10 min). Show the user the name and code to give to the other session.', p: {}, run: async () => api('/invite', {}, (await getMe()).token) },
-  clawkie_join: { d: 'Pair with another session using its name and the code it showed.', p: { name: str('Session name, e.g. brave-otter'), code: str('6-digit code') }, req: ['name', 'code'], run: async a => api('/join', a, (await getMe()).token) },
+  clawkie_whoami: { d: 'Show this session\'s Clawkie name, mode, and paired sessions.', p: {}, run: async () => ({ mode: MODE, relay: RELAY, ...(await call('/whoami')) }) },
+  clawkie_invite: { d: 'Create a one-time 6-digit pairing code (valid 10 min). Show the user the name and code to give to the other session.', p: {}, run: () => call('/invite') },
+  clawkie_join: { d: 'Pair with another session using its name and the code it showed.', p: { name: str('Session name, e.g. brave-otter'), code: str('6-digit code') }, req: ['name', 'code'], run: a => call('/join', a) },
   clawkie_send: {
     d: 'Send a message to a paired session (or "all"). Make prompts self-contained.',
     p: { to: str('Peer session name, or "all"'), text: str('Message or prompt') }, req: ['to', 'text'],
     run: async a => {
-      const r = await api('/send', a, (await getMe()).token)
+      const r = await call('/send', a)
       const pending = readPending(pendingFile)
       for (const n of r.sent_to) delete pending[n]
       writeFileSync(pendingFile, JSON.stringify(pending))
       return r
     },
   },
-  clawkie_status: { d: 'Set this session\'s one-line status visible to peers.', p: { text: str('What this session is doing now') }, req: ['text'], run: async a => api('/status', a, (await getMe()).token) },
-  clawkie_peers: { d: 'List paired sessions with their status, last seen, and online state.', p: {}, run: async () => api('/peers', {}, (await getMe()).token) },
+  clawkie_status: { d: 'Set this session\'s one-line status visible to peers.', p: { text: str('What this session is doing now') }, req: ['text'], run: a => call('/status', a) },
+  clawkie_peers: { d: 'List paired sessions with their status, last seen, and online state.', p: {}, run: () => call('/peers') },
   clawkie_inbox: { d: 'Return and clear messages received since last check (use if channel events are not showing up).', p: {}, run: async () => ({ messages: inbox.splice(0) }) },
-  clawkie_leave: { d: 'Unpair this session from its group.', p: {}, run: async () => api('/leave', {}, (await getMe()).token) },
+  clawkie_history: { d: 'Past messages between sessions in this group, oldest first.', p: { limit: { type: 'number', description: 'How many (default 20, max 200)' }, peer: str('Only messages to/from this session') }, run: a => call('/history', a) },
+  clawkie_remember: { d: 'Save a lasting fact to the group\'s shared notes (every session sees them at startup).', p: { text: str('The fact, decision, or gotcha') }, req: ['text'], run: a => call('/remember', a) },
+  clawkie_notes: { d: 'List the group\'s shared notes with their ids.', p: {}, run: () => call('/notes') },
+  clawkie_forget: { d: 'Delete a shared note by id.', p: { id: { type: 'number', description: 'Note id from clawkie_notes' } }, req: ['id'], run: a => call('/forget', a) },
+  clawkie_handoff: { d: 'Save a handoff summary for this session (what was done, what is in progress, next steps). Shown to the next session in this folder and to peers.', p: { summary: str('The handoff summary') }, req: ['summary'], run: a => call('/handoff', a) },
+  clawkie_leave: { d: 'Unpair this session from its group.', p: {}, run: () => call('/leave') },
 }
 
 const handlers = {
@@ -157,7 +175,7 @@ const handlers = {
     return {
     protocolVersion: p.protocolVersion,
     capabilities: { experimental: { 'claude/channel': {} }, tools: {} },
-    serverInfo: { name: 'clawkie', version: '0.2.1' },
+    serverInfo: { name: 'clawkie', version: '0.3.0' },
     instructions: `${who} (${MODE} mode). Clawkie connects this Claude Code session to the user's other Claude Code sessions working on the same project.\n\n${RULES}`,
     }
   },

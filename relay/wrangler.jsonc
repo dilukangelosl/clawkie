@@ -5,6 +5,7 @@
   "account_id": "a7557e34e650282d40e6bb2591d61e9f",
   "durable_objects": { "bindings": [{ "name": "RELAY", "class_name": "Relay" }] },
   "workers_dev": true,
+  "d1_databases": [{ "binding": "DB", "database_name": "clawkie", "database_id": "c70fa0d6-8fc4-42a2-b524-bff7343ed436" }],
   "routes": [{ "pattern": "relay.clawkie.xyz", "custom_domain": true }],
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Relay"] }]
 }

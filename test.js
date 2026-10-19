@@ -71,6 +71,19 @@ assert.deepEqual(hook('stop', { cwd: '/x' }), {}) // only once
 await b.call('clawkie_send', { to: inv.name, text: 'done' })
 await until(() => events.a.some(e => e.content === 'done'))
 
-console.log('ok: pair, status, send, single-use invite, hooks')
+// memory: history, shared notes, handoffs (D1), all surfaced at session start
+const hist = await a.call('clawkie_history', { peer: bName })
+assert.deepEqual(hist.history.map(m => m.text), ['run the squid migration and report back', 'done'])
+const note = await a.call('clawkie_remember', { text: 'squid graphql runs on vm:4350' })
+assert.equal((await b.call('clawkie_notes')).notes[0].text, 'squid graphql runs on vm:4350')
+hook('stop', { cwd: '/x', last_assistant_message: 'Applied 3 migrations on the VM. Next: reindex from block 1.2M, then verify the graphql counts match.' })
+const ctx = hook('session-start', { cwd: '/x' }).hookSpecificOutput.additionalContext
+assert.match(ctx, /YOU \(last session in this folder\).*Applied 3 migrations/)
+assert.match(ctx, /squid graphql runs on vm:4350/)
+assert.match(ctx, /run the squid migration/)
+assert((await b.call('clawkie_forget', { id: note.id })).ok)
+assert.equal((await a.call('clawkie_notes')).notes.length, 0)
+
+console.log('ok: pair, status, send, single-use invite, hooks, history, notes, handoff')
 await a.client.close(); await b.client.close()
 process.exit(0)
