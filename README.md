@@ -29,7 +29,7 @@ laptop (brave-otter)  ──"run the squid migration, report back"──▶  vm 
 
 - Node.js 22 or newer on every machine (`node -v`)
 - Claude Code, logged in with a claude.ai account (channels need it)
-- Every machine can reach `https://relay.clawkie.xyz` over HTTPS
+- Every machine can reach `https://clawkie-relay.casineo.workers.dev` over HTTPS
 
 ## Install
 
@@ -186,7 +186,7 @@ The rules Claude follows:
 | "no active invite for that session" | The code expired, was used, or got 5 wrong tries. Run "clawkie invite" again. |
 | "unknown peer" | Not paired yet, or a typo. Run "clawkie peers". |
 | Both sessions have the same name | Same working folder. Use `CLAWKIE_ID` (see above). |
-| Relay unreachable | `curl https://relay.clawkie.xyz` should return `{"ok":true,"service":"clawkie-relay"}`. Behind a proxy, allow HTTPS and WebSockets to that host. |
+| Relay unreachable | `curl https://clawkie-relay.casineo.workers.dev` should return `{"ok":true,"service":"clawkie-relay"}`. Behind a proxy, allow HTTPS and WebSockets to that host. |
 
 ## Uninstall
 

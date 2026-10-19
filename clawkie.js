@@ -7,18 +7,29 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 
-const RELAY = (process.env.CLAWKIE_URL || 'https://relay.clawkie.xyz').replace(/\/$/, '')
+// ponytail: workers.dev until relay.clawkie.xyz resolves; then make that the default (same relay, same identities)
+const RELAYS = [(process.env.CLAWKIE_URL || 'https://clawkie-relay.casineo.workers.dev').replace(/\/$/, '')]
+let RELAY = RELAYS[0]
 // Only the human sets the mode (plugin config / env), never a tool, so a peer message can't talk Claude into auto.
 const MODE = process.env.CLAWKIE_MODE === 'auto' ? 'auto' : 'ask'
 const log = (...a) => console.error('[clawkie]', ...a) // stdout is the MCP pipe
 const dir = join(homedir(), '.clawkie')
 
 async function api(path, body, token) {
-  const res = await fetch(RELAY + path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
-    body: JSON.stringify(body ?? {}),
-  })
+  let res, err
+  for (const url of new Set([RELAY, ...RELAYS])) {
+    try {
+      res = await fetch(url + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
+        body: JSON.stringify(body ?? {}),
+        signal: AbortSignal.timeout(10000),
+      })
+      RELAY = url
+      break
+    } catch (e) { err = e }
+  }
+  if (!res) throw new Error(`can't reach the Clawkie relay (${err.cause?.code || err.message})`)
   const data = await res.json().catch(() => ({ error: `relay returned ${res.status}` }))
   if (!res.ok) throw new Error(data.error || `relay returned ${res.status}`)
   return data
@@ -105,7 +116,9 @@ This is an MCP server; Claude Code starts it for you. Set it up with either:
     claude --dangerously-load-development-channels server:clawkie`)
   process.exit(0)
 }
-const me = await identity(process.cwd())
+// Register lazily and retry on failure, so an unreachable relay never stops the server from starting.
+let mePromise
+const getMe = () => (mePromise ??= identity(process.cwd()).catch(e => { mePromise = null; throw e }))
 const pendingFile = paths(process.cwd()).pending
 const send = msg => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...msg }) + '\n')
 
@@ -117,33 +130,37 @@ function push(content, meta) {
 
 const str = d => ({ type: 'string', description: d })
 const tools = {
-  clawkie_whoami: { d: 'Show this session\'s Clawkie name, mode, and paired sessions.', p: {}, run: async () => ({ mode: MODE, ...(await api('/whoami', {}, me.token)) }) },
-  clawkie_invite: { d: 'Create a one-time 6-digit pairing code (valid 10 min). Show the user the name and code to give to the other session.', p: {}, run: () => api('/invite', {}, me.token) },
-  clawkie_join: { d: 'Pair with another session using its name and the code it showed.', p: { name: str('Session name, e.g. brave-otter'), code: str('6-digit code') }, req: ['name', 'code'], run: a => api('/join', a, me.token) },
+  clawkie_whoami: { d: 'Show this session\'s Clawkie name, mode, and paired sessions.', p: {}, run: async () => ({ mode: MODE, relay: RELAY, ...(await api('/whoami', {}, (await getMe()).token)) }) },
+  clawkie_invite: { d: 'Create a one-time 6-digit pairing code (valid 10 min). Show the user the name and code to give to the other session.', p: {}, run: async () => api('/invite', {}, (await getMe()).token) },
+  clawkie_join: { d: 'Pair with another session using its name and the code it showed.', p: { name: str('Session name, e.g. brave-otter'), code: str('6-digit code') }, req: ['name', 'code'], run: async a => api('/join', a, (await getMe()).token) },
   clawkie_send: {
     d: 'Send a message to a paired session (or "all"). Make prompts self-contained.',
     p: { to: str('Peer session name, or "all"'), text: str('Message or prompt') }, req: ['to', 'text'],
     run: async a => {
-      const r = await api('/send', a, me.token)
+      const r = await api('/send', a, (await getMe()).token)
       const pending = readPending(pendingFile)
       for (const n of r.sent_to) delete pending[n]
       writeFileSync(pendingFile, JSON.stringify(pending))
       return r
     },
   },
-  clawkie_status: { d: 'Set this session\'s one-line status visible to peers.', p: { text: str('What this session is doing now') }, req: ['text'], run: a => api('/status', a, me.token) },
-  clawkie_peers: { d: 'List paired sessions with their status, last seen, and online state.', p: {}, run: () => api('/peers', {}, me.token) },
+  clawkie_status: { d: 'Set this session\'s one-line status visible to peers.', p: { text: str('What this session is doing now') }, req: ['text'], run: async a => api('/status', a, (await getMe()).token) },
+  clawkie_peers: { d: 'List paired sessions with their status, last seen, and online state.', p: {}, run: async () => api('/peers', {}, (await getMe()).token) },
   clawkie_inbox: { d: 'Return and clear messages received since last check (use if channel events are not showing up).', p: {}, run: async () => ({ messages: inbox.splice(0) }) },
-  clawkie_leave: { d: 'Unpair this session from its group.', p: {}, run: () => api('/leave', {}, me.token) },
+  clawkie_leave: { d: 'Unpair this session from its group.', p: {}, run: async () => api('/leave', {}, (await getMe()).token) },
 }
 
 const handlers = {
-  initialize: p => ({
+  initialize: async p => {
+    const name = await getMe().then(m => m.name, e => { log(e.message); return null })
+    const who = name ? `You are Clawkie session "${name}"` : 'Clawkie could not reach its relay yet (it keeps retrying; tools will work once it does)'
+    return {
     protocolVersion: p.protocolVersion,
     capabilities: { experimental: { 'claude/channel': {} }, tools: {} },
-    serverInfo: { name: 'clawkie', version: '0.2.0' },
-    instructions: `You are Clawkie session "${me.name}" (${MODE} mode). Clawkie connects this Claude Code session to the user's other Claude Code sessions working on the same project.\n\n${RULES}`,
-  }),
+    serverInfo: { name: 'clawkie', version: '0.2.1' },
+    instructions: `${who} (${MODE} mode). Clawkie connects this Claude Code session to the user's other Claude Code sessions working on the same project.\n\n${RULES}`,
+    }
+  },
   ping: () => ({}),
   'tools/list': () => ({
     tools: Object.entries(tools).map(([name, t]) => ({ name, description: t.d, inputSchema: { type: 'object', properties: t.p, required: t.req ?? [] } })),
@@ -168,10 +185,15 @@ createInterface({ input: process.stdin }).on('line', async line => {
   if (!h) return send({ id: msg.id, error: { code: -32601, message: `method not found: ${msg.method}` } })
   try { send({ id: msg.id, result: await h(msg.params ?? {}) }) } catch (e) { send({ id: msg.id, error: { code: -32603, message: e.message } }) }
 }).on('close', () => process.exit(0))
-log(`session ${me.name} (${MODE} mode) via ${RELAY}`)
 
 let backoff = 1000
-function connect() {
+async function connect() {
+  let me
+  try { me = await getMe() } catch (e) {
+    log(e.message)
+    return setTimeout(connect, backoff = Math.min(backoff * 2, 60000))
+  }
+  log(`session ${me.name} (${MODE} mode) via ${RELAY}`)
   // Node's WebSocket (undici) accepts headers, which keeps the token out of the URL.
   const ws = new WebSocket(RELAY.replace(/^http/, 'ws') + '/ws', { headers: { Authorization: `Bearer ${me.token}` } })
   ws.onopen = () => { backoff = 1000 }

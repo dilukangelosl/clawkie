@@ -1,7 +1,7 @@
 {
   "name": "clawkie",
   "displayName": "Clawkie",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A walkie-talkie for your Claude Code agents: sessions on different machines pair up and pass prompts, results and status.",
   "author": { "name": "Diluk Angelo" },
   "homepage": "https://clawkie.xyz",
