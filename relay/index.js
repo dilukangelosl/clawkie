@@ -166,6 +166,7 @@ export class Relay extends DurableObject {
         //   wrapped    = the group key encrypted with a key derived from the secret
         //   proof_hash = sha256 of a second value derived from the secret, which the joiner must present
         // So joining needs the full 128-bit secret: nothing to guess, and the relay can't unwrap the key.
+        if (!body.wrapped) return json({ error: 'this Clawkie client is outdated (pre-0.4). Run: claude plugin marketplace update clawkie && claude plugin update clawkie@clawkie, then restart Claude Code' }, 426)
         const wrapped = this.field(body, 'wrapped', 200)
         const proofHash = this.field(body, 'proof_hash', 64, false)
         if (!/^[0-9a-f]{64}$/.test(proofHash)) return json({ error: 'bad proof_hash' }, 400)
@@ -173,6 +174,7 @@ export class Relay extends DurableObject {
         return json({ name: me.name, expires_in_minutes: INVITE_TTL / 60000 })
       }
       case '/join': {
+        if (body.code && !body.proof) return json({ error: 'this Clawkie client is outdated (pre-0.4). Run: claude plugin marketplace update clawkie && claude plugin update clawkie@clawkie, then restart Claude Code and use a new invite' }, 426)
         if (!NAME_RE.test(String(body.name)) || !/^[A-Za-z0-9_-]{43}$/.test(String(body.proof))) return json({ error: 'expected a session name and an invite proof' }, 400)
         const inv = this.one('SELECT * FROM invites WHERE name = ?', String(body.name))
         if (!inv || inv.exp < Date.now()) return json({ error: 'no active invite for that session; ask it to create a new one' }, 404)
