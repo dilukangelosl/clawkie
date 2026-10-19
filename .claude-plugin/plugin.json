@@ -1,0 +1,27 @@
+{
+  "name": "clawkie",
+  "displayName": "Clawkie",
+  "version": "0.2.0",
+  "description": "A walkie-talkie for your Claude Code agents: sessions on different machines pair up and pass prompts, results and status.",
+  "author": { "name": "Diluk Angelo" },
+  "homepage": "https://clawkie.xyz",
+  "repository": "https://github.com/dilukangelosl/clawkie",
+  "license": "MIT",
+  "mcpServers": {
+    "clawkie": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/clawkie.js"],
+      "env": { "CLAWKIE_MODE": "${user_config.mode}" }
+    }
+  },
+  "channels": [{ "server": "clawkie", "displayName": "Clawkie" }],
+  "userConfig": {
+    "mode": {
+      "type": "string",
+      "title": "Mode",
+      "description": "ask: confirm with you before acting on a peer's request. auto: act right away.",
+      "options": ["ask", "auto"],
+      "default": "ask"
+    }
+  }
+}

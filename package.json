@@ -1,13 +1,15 @@
 {
   "name": "clawkie",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A walkie-talkie for your Claude Code agents: cross-device MCP comms",
   "type": "module",
   "bin": {
     "clawkie": "clawkie.js"
   },
   "files": [
-    "clawkie.js"
+    "clawkie.js",
+    ".claude-plugin",
+    "hooks"
   ],
   "engines": {
     "node": ">=22"
@@ -17,11 +19,9 @@
     "deploy": "cd relay && ../node_modules/.bin/wrangler deploy",
     "test": "node test.js"
   },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.1"
-  },
   "devDependencies": {
     "wrangler": "^4.151.1",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "@modelcontextprotocol/sdk": "^1.32.1"
   }
 }

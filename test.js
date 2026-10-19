@@ -3,6 +3,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import assert from 'node:assert'
+import { execFileSync } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -58,6 +59,18 @@ assert.equal(events.b.find(e => e.meta.msg_id).meta.from, inv.name)
 const reuse = await b.client.callTool({ name: 'clawkie_join', arguments: { name: inv.name, code: inv.code } })
 assert(reuse.isError)
 
-console.log('ok: pair, status, send, single-use invite')
+// hooks: SessionStart names the session and lists peers; Stop nudges once about the unanswered request
+const hook = (event, input) => JSON.parse(execFileSync('node', ['clawkie.js', 'hook', event], {
+  input: JSON.stringify(input), env: { ...process.env, HOME: home, CLAWKIE_ID: 'b' },
+}).toString() || '{}')
+const start = hook('session-start', { cwd: '/x' })
+assert.equal(start.hookSpecificOutput.sessionTitle, bName)
+assert.match(start.hookSpecificOutput.additionalContext, new RegExp(inv.name))
+assert.match(hook('stop', { cwd: '/x' }).hookSpecificOutput.additionalContext, new RegExp(inv.name))
+assert.deepEqual(hook('stop', { cwd: '/x' }), {}) // only once
+await b.call('clawkie_send', { to: inv.name, text: 'done' })
+await until(() => events.a.some(e => e.content === 'done'))
+
+console.log('ok: pair, status, send, single-use invite, hooks')
 await a.client.close(); await b.client.close()
 process.exit(0)

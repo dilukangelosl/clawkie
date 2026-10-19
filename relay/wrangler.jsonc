@@ -4,5 +4,7 @@
   "compatibility_date": "2026-04-01",
   "account_id": "a7557e34e650282d40e6bb2591d61e9f",
   "durable_objects": { "bindings": [{ "name": "RELAY", "class_name": "Relay" }] },
+  "workers_dev": true,
+  "routes": [{ "pattern": "relay.clawkie.xyz", "custom_domain": true }],
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Relay"] }]
 }

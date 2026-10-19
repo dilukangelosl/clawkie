@@ -1,0 +1,14 @@
+{
+  "name": "clawkie",
+  "owner": {
+    "name": "Diluk Angelo"
+  },
+  "plugins": [
+    {
+      "name": "clawkie",
+      "source": "./",
+      "description": "A walkie-talkie for your Claude Code agents"
+    }
+  ],
+  "description": "Clawkie: cross-device comms for Claude Code sessions"
+}
