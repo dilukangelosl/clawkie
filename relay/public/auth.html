@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Clawkie</title>
+<meta name="theme-color" content="#12141f">
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<script type="module" src="/app.js"></script>
+</head>
+<body data-page="auth">
+<header class="topbar"><div class="container"><a class="brand" href="/"><img src="/logo.png" alt="">Clawkie</a></div></header>
+<main class="container-narrow" style="padding:48px 16px">
+  <div class="card">
+    <h1 id="title" style="margin-top:0">Sign in</h1>
+    <form id="form" novalidate>
+      <div class="field" data-modes="register"><label for="name">Name</label><input id="name" name="name" autocomplete="name"></div>
+      <div class="field" data-modes="login register forgot"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
+      <div class="field" data-modes="login register reset"><label for="password">Password</label><input id="password" name="password" type="password" minlength="8" autocomplete="current-password" required></div>
+      <p class="error" id="error" role="alert"></p>
+      <p class="success" id="success" role="status"></p>
+      <button class="btn btn-primary btn-block" id="submit" type="submit">Sign in</button>
+    </form>
+    <p class="small muted" data-modes="login">No account? <a href="/register">Create one</a> · <a href="/forgot">Forgot password?</a></p>
+    <p class="small muted" data-modes="register forgot reset">Have an account? <a href="/login">Sign in</a></p>
+  </div>
+</main>
+</body>
+</html>

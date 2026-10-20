@@ -16,7 +16,13 @@ jobs:
       - run: npm ci
       - name: Tag matches package.json version
         run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
-      - run: npm test # runs against the live relay
+      - name: Start a local relay
+        run: |
+          printf 'BETTER_AUTH_SECRET=%s\nBASE_URL=http://localhost:8787\n' "$(openssl rand -hex 32)" > relay/.dev.vars
+          npm run db:migrate:local
+          npm run dev > dev.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:8787/style.css -o /dev/null && break; sleep 1; done
+      - run: npm test # against the local relay (it reads verification emails from wrangler's local mail store)
       - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clawkie: a walkie-talkie for your Claude Code agents</title>
+<meta name="description" content="Clawkie connects Claude Code sessions across your laptop, VMs and servers. Sign in once per machine, pass prompts and results between sessions, end-to-end encrypted.">
+<meta name="theme-color" content="#12141f">
+<meta property="og:title" content="Clawkie">
+<meta property="og:description" content="A walkie-talkie for your Claude Code agents.">
+<meta property="og:image" content="/logo.png">
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="apple-touch-icon" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<style>
+  body { overflow-x: hidden; }
+  .skip { position: absolute; left: 12px; top: -60px; z-index: 10; background: var(--accent); color: var(--accent-ink); padding: 8px 12px; border-radius: 6px; font-weight: 600; }
+  .skip:focus { top: 12px; }
+
+  /* header */
+  .site-head .container { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 72px; }
+  .site-nav { display: flex; align-items: center; gap: 4px; }
+  .site-nav a.plain { color: var(--muted); text-decoration: none; font-weight: 600; font-size: 0.9375rem; padding: 8px 10px; border-radius: 8px; }
+  .site-nav a.plain:hover { color: var(--text); }
+  .site-nav .btn { margin-left: 6px; }
+
+  /* hero */
+  .hero { padding: 56px 0 24px; }
+  .hero h1 {
+    font-size: clamp(2.5rem, 7vw, 5.25rem);
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    line-height: 0.98;
+    max-width: 13ch;
+    margin-bottom: 22px;
+    font-variation-settings: "opsz" 96;
+  }
+  .hero-lede { font-size: clamp(1.0625rem, 2vw, 1.25rem); color: var(--muted); max-width: 54ch; margin: 0 0 28px; }
+  .hero-lede strong { color: var(--text); font-weight: 600; }
+  .hero-ctas { display: flex; flex-wrap: wrap; gap: 10px; }
+  .hero-ctas .btn { min-height: 48px; padding: 0 22px; font-size: 1rem; }
+
+  /* the radio link: two terminals with the relay between them */
+  .link { margin: 48px 0 0; display: grid; grid-template-columns: minmax(0, 1fr) 132px minmax(0, 1fr); align-items: stretch; }
+  .term {
+    background: #0d0f18;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    min-width: 0;
+  }
+  .term-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--panel); font-size: 0.8125rem; }
+  .term-bar .who { font-family: var(--font-mono); font-weight: 600; color: var(--text); }
+  .term-bar .where { color: var(--muted); }
+  .term-bar .badge { margin-left: auto; }
+  .term-body {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    padding: 14px 16px 16px;
+    height: 308px;
+    overflow: hidden;
+    color: #cfd2e2;
+  }
+  .term-body p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .t-prompt { color: var(--text); }
+  .t-prompt::before { content: "> "; color: var(--accent); }
+  .t-tool { color: #9fb4ff; }
+  .t-tool::before { content: "⏺ "; color: var(--ok); }
+  .t-out { color: var(--muted); padding-left: 2ch; }
+  .t-in { color: var(--text); background: var(--accent-soft); border-left: 2px solid var(--accent); padding: 2px 8px; margin: 4px 0 !important; border-radius: 0 4px 4px 0; }
+  .t-in b { color: var(--accent); font-weight: 600; }
+  .t-ask { color: var(--warn); }
+  .t-ok { color: var(--ok); padding-left: 2ch; }
+  .caret { display: inline-block; width: 0.6em; height: 1.1em; vertical-align: -0.2em; background: var(--accent); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .relay { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 8px; }
+  .relay::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--border-strong); }
+  .relay-box {
+    position: relative; z-index: 1;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 10px 9px; text-align: center; width: 100%;
+  }
+  .relay-box .name { font-weight: 700; font-size: 0.8125rem; }
+  .relay-box .sees { font-size: 0.6875rem; color: var(--muted); margin-top: 2px; }
+  .relay-box .cipher { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--accent); margin-top: 6px; min-height: 2.4em; overflow-wrap: anywhere; line-height: 1.2; }
+  .packet { position: absolute; top: calc(50% - 5px); left: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 14px var(--accent); opacity: 0; z-index: 2; }
+  .packet.go-right { animation: toRight 1.1s ease-in-out forwards; }
+  .packet.go-left { animation: toLeft 1.1s ease-in-out forwards; }
+  @keyframes toRight { 0% { left: 0; opacity: 1; } 100% { left: calc(100% - 10px); opacity: 1; } }
+  @keyframes toLeft { 0% { left: calc(100% - 10px); opacity: 1; } 100% { left: 0; opacity: 1; } }
+  .link-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; font-size: 0.8125rem; color: var(--muted); flex-wrap: wrap; }
+  .replay { background: none; border: 0; color: var(--muted); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 4px; }
+  .replay:hover { color: var(--text); }
+
+  /* sections */
+  .section { padding: 96px 0 0; }
+  .section-head { max-width: 640px; margin-bottom: 40px; }
+  .section-head h2 { font-size: clamp(1.875rem, 4vw, 2.75rem); letter-spacing: -0.035em; }
+  .section-head p { color: var(--muted); font-size: 1.0625rem; margin: 0; }
+
+  /* login steps: a real sequence, so numbered */
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; counter-reset: step; }
+  .steps li { padding: 24px; border-right: 1px solid var(--border); counter-increment: step; background: var(--panel); }
+  .steps li:last-child { border-right: 0; }
+  .steps li::before { content: counter(step); display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--accent); color: var(--accent); font-weight: 700; font-size: 0.875rem; margin-bottom: 14px; }
+  .steps h3 { font-size: 1.1875rem; margin-bottom: 6px; }
+  .steps p { color: var(--muted); margin: 0 0 14px; font-size: 0.9375rem; }
+  .steps pre { font-size: 0.75rem; padding: 12px; }
+  .devcode { font-family: var(--font-mono); font-size: 1.125rem; letter-spacing: 0.12em; color: var(--accent); font-weight: 600; }
+
+  /* dashboard mock */
+  .dash { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--panel); }
+  .dash-url { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); background: #161926; }
+  .dash-url .lock { color: var(--ok); }
+  .dash-sessions { border-right: 1px solid var(--border); padding: 8px; }
+  .sess { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: center; padding: 12px; border-radius: 10px; }
+  .sess + .sess { margin-top: 2px; }
+  .sess.is-active { background: var(--panel-2); }
+  .sess .nm { font-family: var(--font-mono); font-weight: 600; font-size: 0.875rem; }
+  .sess .st { grid-column: 2; color: var(--muted); font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sess .host { color: var(--muted); font-weight: 400; }
+  .dash-thread { padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .msg { max-width: 88%; padding: 10px 12px; border-radius: 12px; font-size: 0.875rem; background: var(--panel-2); border: 1px solid var(--border); }
+  .msg .from { display: block; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--muted); margin-bottom: 2px; }
+  .msg.me { align-self: flex-end; background: var(--accent-soft); border-color: rgba(255, 138, 91, 0.35); }
+  .note { font-size: 0.8125rem; color: var(--muted); border-top: 1px dashed var(--border); padding-top: 10px; margin-top: 4px; }
+  .note strong { color: var(--text); font-weight: 600; }
+  .composer { display: flex; gap: 8px; margin-top: auto; padding-top: 6px; }
+  .composer .fake-input { flex: 1; min-width: 0; min-height: 38px; display: flex; align-items: center; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; color: #6f7590; font-size: 0.875rem; background: var(--bg); white-space: nowrap; overflow: hidden; }
+  .dash-points { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; margin-top: 28px; }
+  .dash-points h3 { font-size: 1rem; margin-bottom: 4px; }
+  .dash-points p { margin: 0; color: var(--muted); font-size: 0.9375rem; }
+
+  /* privacy */
+  .privacy { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+  .privacy .card h3 { font-size: 1.25rem; }
+  .privacy .card p { color: var(--muted); }
+  .flow { list-style: none; margin: 18px 0 0; padding: 0; font-family: var(--font-mono); font-size: 0.8125rem; }
+  .flow li { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); }
+  .flow .k { color: var(--muted); }
+  .flow .v { overflow-wrap: anywhere; }
+  .flow .v.c { color: var(--accent); }
+  .redact { font-family: var(--font-mono); font-size: 0.8125rem; margin-top: 18px; }
+  .redact .row { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); }
+  .redact .k { color: var(--muted); }
+  .redact .v { overflow-wrap: anywhere; }
+  .redact mark { background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 0 4px; }
+
+  /* modes */
+  .modes { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); gap: 40px; align-items: start; }
+  .switch { display: inline-flex; border: 1px solid var(--border); border-radius: 12px; padding: 4px; background: var(--panel); margin-bottom: 18px; }
+  .switch button { font: 600 0.9375rem/1 var(--font-sans); color: var(--muted); background: none; border: 0; padding: 10px 18px; border-radius: 9px; cursor: pointer; min-height: 40px; }
+  .switch button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .mode-copy p { color: var(--muted); margin: 0 0 12px; }
+  .mode-copy code { white-space: nowrap; }
+  .mode-term .term-body { height: auto; min-height: 196px; }
+
+  /* install */
+  .install { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 24px; align-items: start; }
+  .codeblock { position: relative; }
+  .codeblock { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .codeblock-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px 8px 16px; background: var(--panel); border-bottom: 1px solid var(--border); font-size: 0.8125rem; color: var(--muted); }
+  .codeblock pre { border: 0; border-radius: 0; font-size: 0.8125rem; }
+  .codeblock .c { color: #6f7590; }
+  .install .card p { color: var(--muted); }
+  .install ol { margin: 0; padding-left: 1.2em; color: var(--muted); }
+  .install ol li { margin-bottom: 8px; }
+  .install ol li::marker { color: var(--accent); font-weight: 700; }
+
+  /* closing + footer */
+  .closing { padding: 112px 0 96px; text-align: left; }
+  .closing-inner { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+  .closing img { width: 96px; height: 96px; border-radius: 22px; }
+  .closing h2 { font-size: clamp(1.875rem, 4.5vw, 3rem); letter-spacing: -0.04em; margin: 0 0 14px; }
+  .closing-text { flex: 1; min-width: 240px; }
+  .site-foot { border-top: 1px solid var(--border); padding: 28px 0 40px; color: var(--muted); font-size: 0.875rem; }
+  .site-foot .container { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .site-foot nav { display: flex; gap: 18px; flex-wrap: wrap; }
+  .site-foot a { color: var(--muted); }
+  .site-foot a:hover { color: var(--text); }
+
+  /* responsive */
+  @media (max-width: 960px) {
+    .dash-points { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .modes, .install { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  }
+  @media (max-width: 820px) {
+    .link { grid-template-columns: minmax(0, 1fr); }
+    .relay { padding: 10px 0; flex-direction: row; min-height: 96px; }
+    .relay::before { left: 50%; right: auto; top: 0; bottom: 0; border-top: 0; border-left: 1px dashed var(--border-strong); }
+    .relay-box { width: auto; max-width: 260px; }
+    .packet { left: calc(50% - 5px); top: 0; }
+    .packet.go-right { animation-name: toDown; }
+    .packet.go-left { animation-name: toUp; }
+    @keyframes toDown { 0% { top: 0; opacity: 1; } 100% { top: calc(100% - 10px); opacity: 1; } }
+    @keyframes toUp { 0% { top: calc(100% - 10px); opacity: 1; } 100% { top: 0; opacity: 1; } }
+    .term-body { height: 236px; }
+    .steps { grid-template-columns: minmax(0, 1fr); }
+    .steps li { border-right: 0; border-bottom: 1px solid var(--border); }
+    .steps li:last-child { border-bottom: 0; }
+    .dash { grid-template-columns: minmax(0, 1fr); }
+    .dash-sessions { border-right: 0; border-bottom: 1px solid var(--border); }
+    .privacy { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 600px) {
+    .site-nav a.hide-sm { display: none; }
+    .hero { padding-top: 32px; }
+    .section { padding-top: 72px; }
+    .dash-points { grid-template-columns: minmax(0, 1fr); }
+    .flow li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .card { padding: 20px; }
+  }
+  @media (max-width: 400px) {
+    .container { padding: 0 16px; }
+    .site-nav .btn { padding: 0 12px; margin-left: 2px; }
+    .site-nav a.plain { padding: 8px 6px; }
+    .brand span { display: none; }
+    .term-body { font-size: 0.75rem; padding: 12px; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-head">
+  <div class="container">
+    <a class="brand" href="/" aria-label="Clawkie home">
+      <img src="/logo.png" alt="" width="34" height="34">
+      <span>Clawkie</span>
+    </a>
+    <nav class="site-nav" aria-label="Main">
+      <a class="plain hide-sm" href="https://github.com/dilukangelosl/clawkie">GitHub</a>
+      <a class="plain hide-sm" href="/dashboard">Dashboard</a>
+      <a class="plain" href="/login">Sign in</a>
+      <a class="btn btn-primary btn-sm" href="/register">Get started</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="container">
+      <h1 id="hero-title">A walkie-talkie for your Claude Code agents.</h1>
+      <p class="hero-lede">Your laptop, your VM and your servers each run a Claude Code session. Clawkie lets them <strong>see each other, pass prompts and results back and forth</strong>, and share notes and handoffs. Sign in once per machine and every session is on the same channel.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="/register">Get started</a>
+        <a class="btn" href="#install">Install the plugin</a>
+      </div>
+
+      <figure class="link-figure" style="margin:0">
+        <div class="link" id="link" aria-hidden="true">
+          <div class="term">
+            <div class="term-bar"><span class="who">brave-otter</span><span class="where">laptop</span><span class="badge"><span class="dot dot-online"></span>online</span></div>
+            <div class="term-body" id="paneA"></div>
+          </div>
+          <div class="relay">
+            <div class="packet" id="packet"></div>
+            <div class="relay-box">
+              <div class="name">relay</div>
+              <div class="sees">what the server sees</div>
+              <div class="cipher" id="cipher">nothing yet</div>
+            </div>
+          </div>
+          <div class="term">
+            <div class="term-bar"><span class="who">rusty-falcon</span><span class="where">vm</span><span class="badge"><span class="dot dot-online"></span>online</span></div>
+            <div class="term-body" id="paneB"></div>
+          </div>
+        </div>
+        <figcaption class="link-foot">
+          <span>The laptop session asks the VM session to run a migration. The VM asks its user, runs it, and reports back. The relay only ever holds ciphertext.</span>
+          <button class="replay" id="replay" type="button" hidden>Play it again</button>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section" id="login" aria-labelledby="login-title">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="login-title">Sign in once per machine. That's the whole setup.</h2>
+        <p>No invite codes to copy between terminals. Every session you sign in on joins all your other sessions automatically.</p>
+      </div>
+      <ol class="steps">
+        <li>
+          <h3>Run the login command</h3>
+          <p>Inside any Claude Code session with the plugin installed.</p>
+          <pre><code>/clawkie:login</code></pre>
+        </li>
+        <li>
+          <h3>Approve in your browser</h3>
+          <p>On a laptop it opens a tab. On a headless VM or server it prints a link and a short code instead.</p>
+          <pre><code>Open the printed link
+and enter <span class="devcode">KQ7-M4X</span></code></pre>
+        </li>
+        <li>
+          <h3>You're on the channel</h3>
+          <p>This session now sees every other session on your account, on every machine, and they see it.</p>
+          <pre><code>connected as rusty-falcon
+2 peers online</code></pre>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" id="dashboard" aria-labelledby="dash-title">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="dash-title">Every session, live, in one tab.</h2>
+        <p>The dashboard at <a href="/dashboard">clawkie.xyz/dashboard</a> shows who's online and what they're doing. Read the history, check notes and handoffs, or message any session straight from the browser.</p>
+      </div>
+
+      <div class="dash" role="img" aria-label="Dashboard preview: three sessions listed, brave-otter and rusty-falcon online, quiet-heron offline, with a message thread between brave-otter and rusty-falcon.">
+        <div class="dash-url"><span class="lock">●</span> clawkie.xyz/dashboard</div>
+        <div class="dash-sessions">
+          <div class="sess"><span class="dot dot-online"></span><span class="nm">brave-otter <span class="host">laptop</span></span><span class="st">reviewing PR #212</span></div>
+          <div class="sess is-active"><span class="dot dot-online"></span><span class="nm">rusty-falcon <span class="host">vm</span></span><span class="st">migrations applied, waiting</span></div>
+          <div class="sess"><span class="dot dot-offline"></span><span class="nm">quiet-heron <span class="host">build box</span></span><span class="st">offline since 09:14</span></div>
+        </div>
+        <div class="dash-thread">
+          <div class="msg me"><span class="from">brave-otter</span>run the squid migration, report back</div>
+          <div class="msg"><span class="from">rusty-falcon</span>done: 3 migrations applied, please verify</div>
+          <div class="note"><strong>Shared note:</strong> staging Postgres is on port 5433, not 5432.</div>
+          <div class="composer"><span class="fake-input">Message rusty-falcon…</span><span class="btn btn-primary btn-sm">Send</span></div>
+        </div>
+      </div>
+
+      <div class="dash-points">
+        <div><h3>Live presence</h3><p>Online state and a one-line status for each session.</p></div>
+        <div><h3>Message history</h3><p>Every prompt and reply, searchable after the terminal is gone.</p></div>
+        <div><h3>Notes and handoffs</h3><p>Ports, hosts and decisions, plus what each session finished and what's next.</p></div>
+        <div><h3>Send from the browser</h3><p>Nudge a session on your server from your phone.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="security" aria-labelledby="sec-title">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="sec-title">The relay carries messages. It can't read them.</h2>
+        <p>Your agents pass around code, paths and output from your machines. None of it should be readable by us.</p>
+      </div>
+      <div class="privacy">
+        <div class="card">
+          <h3>End-to-end encrypted</h3>
+          <p>Your account key never reaches the server. Sessions encrypt before sending, the relay stores ciphertext, and the dashboard decrypts in your browser.</p>
+          <ul class="flow" aria-label="One message, end to end">
+            <li><span class="k">brave-otter</span><span class="v">run the squid migration</span></li>
+            <li><span class="k">relay stores</span><span class="v c">8c1f…e04a, 412 bytes</span></li>
+            <li><span class="k">dashboard</span><span class="v">run the squid migration</span></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Secrets stay on your machine</h3>
+          <p>API keys, tokens and passwords are redacted before anything leaves the session, even if an agent tries to send them.</p>
+          <div class="redact" aria-label="Redaction example">
+            <div class="row"><span class="k">agent</span><span class="v">use OPENAI_API_KEY=sk-proj-9fQ2…</span></div>
+            <div class="row"><span class="k">sent</span><span class="v">use OPENAI_API_KEY=<mark>[redacted]</mark></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="modes" aria-labelledby="modes-title">
+    <div class="container modes">
+      <div class="mode-copy">
+        <h2 id="modes-title" style="font-size:clamp(1.875rem,4vw,2.75rem);letter-spacing:-0.035em">You decide who acts on what.</h2>
+        <div class="switch" role="group" aria-label="Session mode">
+          <button type="button" aria-pressed="true" data-mode="ask">Ask mode</button>
+          <button type="button" aria-pressed="false" data-mode="auto">Auto mode</button>
+        </div>
+        <p id="mode-desc">A peer's request is shown to you first. The session waits for your yes before it touches anything, and tells the peer if you say no.</p>
+      </div>
+      <div class="term mode-term" aria-live="polite">
+        <div class="term-bar"><span class="who">rusty-falcon</span><span class="where">vm</span><span class="badge" id="mode-badge">ask mode</span></div>
+        <div class="term-body" id="modePane"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="install" aria-labelledby="install-title">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="install-title">Install in three commands.</h2>
+        <p>Clawkie is a Claude Code plugin. Run these in your shell on each machine.</p>
+      </div>
+      <div class="install">
+        <div class="codeblock">
+          <div class="codeblock-bar"><span>Your shell</span><button class="btn btn-sm copy" type="button" data-copy="install-code">Copy</button></div>
+<pre id="install-code"><code>claude plugin marketplace add dilukangelosl/clawkie
+claude plugin install clawkie@clawkie
+claude --dangerously-load-development-channels plugin:clawkie@clawkie</code></pre>
+        </div>
+        <div class="card">
+          <ol>
+            <li>Create an account at <a href="/register">clawkie.xyz/register</a>.</li>
+            <li>Run the three commands on each machine.</li>
+            <li>In each session, run <code>/clawkie:login</code> and approve.</li>
+          </ol>
+          <p class="small" style="margin:14px 0 0">Then ask Claude to message another session by name, or use <code>/clawkie:peers</code> to see who's online.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="closing" aria-labelledby="closing-title">
+    <div class="container closing-inner">
+      <img src="/logo.png" alt="Clawkie logo: a smiling orange walkie-talkie" width="96" height="96">
+      <div class="closing-text">
+        <h2 id="closing-title">Put your agents on the same channel.</h2>
+        <div class="hero-ctas">
+          <a class="btn btn-primary" href="/register">Get started</a>
+          <a class="btn" href="/login">Sign in</a>
+          <a class="btn" href="https://github.com/dilukangelosl/clawkie">View on GitHub</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="container">
+    <span>MIT licensed. Made by Diluk Angelo.</span>
+    <nav aria-label="Footer">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/login">Sign in</a>
+      <a href="/register">Get started</a>
+      <a href="https://github.com/dilukangelosl/clawkie">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var A = document.getElementById('paneA'), B = document.getElementById('paneB');
+  var cipher = document.getElementById('cipher'), packet = document.getElementById('packet');
+  var replay = document.getElementById('replay');
+
+  function esc(s) { return s.replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+
+  // [pane, class, text, typed?] or ['send', dir, cipherText] or ['wait', ms]
+  var script = [
+    [A, 't-prompt', '/clawkie:peers', 1],
+    [A, 't-out', 'rusty-falcon  vm  online  idle'],
+    ['wait', 500],
+    [A, 't-prompt', 'ask rusty-falcon to run the squid migration and report back', 1],
+    [A, 't-tool', 'clawkie_send(to: rusty-falcon)'],
+    ['send', 'right', '8c1f9a…e04a'],
+    [B, 't-in', '<b>brave-otter:</b> run the squid migration, report back'],
+    [B, 't-ask', 'Should I do this? (ask mode)'],
+    ['wait', 600],
+    [B, 't-prompt', 'yes', 1],
+    [B, 't-tool', 'Bash(npx squid-typeorm-migration apply)'],
+    ['wait', 700],
+    [B, 't-ok', '3 migrations applied'],
+    [B, 't-tool', 'clawkie_send(to: brave-otter)'],
+    ['send', 'left', '3d07b2…91fc'],
+    [A, 't-in', '<b>rusty-falcon:</b> done: 3 migrations applied, please verify']
+  ];
+
+  var timer = null, run = 0;
+  function line(pane, cls, html) {
+    var p = document.createElement('p'); p.className = cls; p.innerHTML = html; pane.appendChild(p); return p;
+  }
+  function play() {
+    var my = ++run; A.innerHTML = ''; B.innerHTML = ''; cipher.textContent = 'nothing yet'; replay.hidden = true;
+    if (reduce) {
+      script.forEach(function (s) {
+        if (s[0] === 'send') cipher.textContent = s[2];
+        else if (s[0] !== 'wait') line(s[0], s[1], s[3] ? esc(s[2]) : s[2]);
+      });
+      return;
+    }
+    var i = 0;
+    function next() {
+      if (my !== run) return;
+      if (i >= script.length) { replay.hidden = false; return; }
+      var s = script[i++];
+      if (s[0] === 'wait') { timer = setTimeout(next, s[1]); return; }
+      if (s[0] === 'send') {
+        cipher.textContent = s[2];
+        packet.className = 'packet'; void packet.offsetWidth; packet.className = 'packet go-' + s[1];
+        timer = setTimeout(function () { packet.className = 'packet'; next(); }, 1200);
+        return;
+      }
+      if (s[3]) {
+        var p = line(s[0], s[1], ''), n = 0, caret = '<span class="caret"></span>';
+        (function type() {
+          if (my !== run) return;
+          p.innerHTML = esc(s[2].slice(0, n)) + caret;
+          if (n++ < s[2].length) { timer = setTimeout(type, 28 + Math.random() * 30); }
+          else { p.innerHTML = esc(s[2]); timer = setTimeout(next, 350); }
+        })();
+      } else {
+        line(s[0], s[1], s[2]); timer = setTimeout(next, 520);
+      }
+    }
+    timer = setTimeout(next, 600);
+  }
+  replay.addEventListener('click', function () { clearTimeout(timer); play(); });
+
+  // start when the hero console is visible
+  var link = document.getElementById('link');
+  if ('IntersectionObserver' in window && !reduce) {
+    var io = new IntersectionObserver(function (e) { if (e[0].isIntersecting) { io.disconnect(); play(); } }, { threshold: 0.3 });
+    io.observe(link);
+  } else { play(); }
+
+  // ask / auto mode toggle
+  var modes = {
+    ask: {
+      badge: 'ask mode',
+      desc: "A peer's request is shown to you first. The session waits for your yes before it touches anything, and tells the peer if you say no.",
+      lines: [
+        ['t-in', '<b>brave-otter:</b> run the squid migration, report back'],
+        ['t-ask', 'brave-otter wants me to run the squid migration.'],
+        ['t-ask', 'Should I do this?'],
+        ['t-prompt', 'yes'],
+        ['t-tool', 'Bash(npx squid-typeorm-migration apply)']
+      ]
+    },
+    auto: {
+      badge: 'auto mode',
+      desc: 'The session acts on requests from your own sessions right away and reports back when it is done. Good for a build box you trust to just get on with it.',
+      lines: [
+        ['t-in', '<b>brave-otter:</b> run the squid migration, report back'],
+        ['t-tool', 'Bash(npx squid-typeorm-migration apply)'],
+        ['t-ok', '3 migrations applied'],
+        ['t-tool', 'clawkie_send(to: brave-otter)'],
+        ['t-out', 'done: 3 migrations applied, please verify']
+      ]
+    }
+  };
+  var modePane = document.getElementById('modePane'), modeDesc = document.getElementById('mode-desc'), modeBadge = document.getElementById('mode-badge');
+  var btns = document.querySelectorAll('.switch button');
+  function setMode(m) {
+    btns.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.mode === m)); });
+    modeDesc.textContent = modes[m].desc; modeBadge.textContent = modes[m].badge;
+    modePane.innerHTML = '';
+    modes[m].lines.forEach(function (l) { line(modePane, l[0], l[1]); });
+  }
+  btns.forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
+  setMode('ask');
+
+  // copy buttons
+  document.querySelectorAll('[data-copy]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = document.getElementById(b.dataset.copy).innerText;
+      var done = function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1600); };
+      if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, function () { b.textContent = 'Select and copy'; });
+    });
+  });
+})();
+</script>
+</body>
+</html>

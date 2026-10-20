@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Clawkie</title>
+<meta name="theme-color" content="#12141f">
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<script type="module" src="/app.js"></script>
+<style>
+  .dash { display: grid; grid-template-columns: 280px 1fr; gap: 20px; padding-top: 24px; padding-bottom: 48px; }
+  .dash h2 { font-size: 1rem; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .sess { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 8px; align-items: center; width: 100%; text-align: left; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; font: inherit; }
+  .sess[aria-current="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .sess .meta { grid-column: 2 / 4; font-size: .8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sess b { font-family: var(--font-mono); font-weight: 600; }
+  .thread { display: flex; flex-direction: column; gap: 10px; height: min(60vh, 560px); overflow-y: auto; padding: 4px; }
+  .msg { max-width: 85%; padding: 10px 12px; border-radius: var(--radius); background: var(--panel-2); border: 1px solid var(--border); }
+  .msg.mine { align-self: flex-end; border-color: var(--accent); }
+  .msg .head { font-size: .78rem; color: var(--muted); margin-bottom: 4px; font-family: var(--font-mono); }
+  .msg .body { white-space: pre-wrap; word-break: break-word; }
+  .composer { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; align-items: end; }
+  .composer textarea { min-height: 64px; resize: vertical; }
+  .tabs { display: flex; gap: 6px; margin: 24px 0 12px; flex-wrap: wrap; }
+  .tabs button[aria-selected="true"] { border-color: var(--accent); color: var(--accent); }
+  .item { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel); display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
+  .item .body { white-space: pre-wrap; word-break: break-word; }
+  .banner { margin-top: 20px; }
+  @media (max-width: 760px) { .dash { grid-template-columns: 1fr; } .thread { height: 50vh; } #email { display: none; } }
+</style>
+</head>
+<body data-page="dashboard">
+<header class="topbar"><div class="container"><a class="brand" href="/"><img src="/logo.png" alt="">Clawkie</a><span style="display:flex;gap:10px;align-items:center"><span class="small muted" id="email"></span><button class="btn btn-sm" id="signout">Sign out</button></span></div></header>
+<main class="container">
+  <div class="card banner" id="nokey" hidden>
+    <strong>This browser can't decrypt your sessions yet.</strong>
+    <p class="muted" style="margin-bottom:0">Your account key never reaches our server. In any Claude Code session that's signed in, run <code>/clawkie:dashboard</code> to open this page with the key, or approve your next <code>/clawkie:login</code> from this browser.</p>
+  </div>
+  <div class="card banner" id="empty" hidden>
+    <strong>No machines signed in yet.</strong>
+    <p class="muted">Install the plugin, then run <code>/clawkie:login</code> in Claude Code on each machine:</p>
+    <pre>claude plugin marketplace add dilukangelosl/clawkie
+claude plugin install clawkie@clawkie
+claude --dangerously-load-development-channels plugin:clawkie@clawkie</pre>
+  </div>
+  <div class="dash">
+    <aside>
+      <h2>Sessions</h2>
+      <ul class="list" id="sessions"></ul>
+    </aside>
+    <section aria-labelledby="thread-title">
+      <h2 id="thread-title">All messages</h2>
+      <div class="card" style="padding:12px">
+        <div class="thread" id="thread" aria-live="polite"></div>
+        <form class="composer" id="composer">
+          <label class="sr-only" for="text">Message</label>
+          <textarea id="text" placeholder="Message all sessions… (⌘/Ctrl+Enter to send)"></textarea>
+          <button class="btn btn-primary" type="submit">Send</button>
+        </form>
+        <p class="error small" id="send-error" role="alert"></p>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="btn btn-sm" role="tab" data-tab="notes" aria-selected="true">Shared notes</button>
+        <button class="btn btn-sm" role="tab" data-tab="handoffs" aria-selected="false">Handoffs</button>
+        <button class="btn btn-sm" role="tab" data-tab="devices" aria-selected="false">Devices</button>
+      </div>
+      <div data-panel="notes">
+        <form id="note-form" style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:10px">
+          <label class="sr-only" for="note">New note</label><input id="note" placeholder="Add a fact every session should know (port, host, decision…)">
+          <button class="btn" type="submit">Add</button>
+        </form>
+        <ul class="list" id="notes"></ul>
+      </div>
+      <div data-panel="handoffs" hidden><ul class="list" id="handoffs"></ul></div>
+      <div data-panel="devices" hidden><ul class="list" id="devices"></ul></div>
+    </section>
+  </div>
+</main>
+</body>
+</html>

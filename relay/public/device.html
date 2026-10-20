@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Approve device · Clawkie</title>
+<meta name="theme-color" content="#12141f">
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<script type="module" src="/app.js"></script>
+</head>
+<body data-page="device">
+<header class="topbar"><div class="container"><a class="brand" href="/"><img src="/logo.png" alt="">Clawkie</a><a class="btn btn-sm" href="/dashboard">Dashboard</a></div></header>
+<main class="container-narrow" style="padding:48px 16px">
+  <div class="card">
+    <h1 style="margin-top:0">Sign in a machine</h1>
+    <p class="muted">Enter the code shown in your terminal after <code>/clawkie:login</code>.</p>
+    <form id="form">
+      <div class="field"><label for="code">Code</label><input id="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH" style="font-family:var(--font-mono);font-size:1.25rem;letter-spacing:.1em" required></div>
+      <p class="small" id="device" hidden></p>
+      <p class="error" id="error" role="alert"></p>
+      <p class="success" id="success" role="status"></p>
+      <button class="btn btn-primary btn-block" id="submit" type="submit">Approve</button>
+    </form>
+    <p class="small muted">Only approve a code you just got from your own terminal. The machine gets access to all your Clawkie sessions.</p>
+  </div>
+</main>
+</body>
+</html>

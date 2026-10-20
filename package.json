@@ -1,6 +1,6 @@
 {
   "name": "clawkie",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A walkie-talkie for your Claude Code agents: cross-device MCP comms",
   "type": "module",
   "bin": {
@@ -15,13 +15,16 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "cd relay && ../node_modules/.bin/wrangler dev",
+    "dev": "cd relay && ../node_modules/.bin/wrangler dev --local-upstream localhost:8787",
     "deploy": "cd relay && ../node_modules/.bin/wrangler deploy",
-    "test": "node test.js"
+    "test": "node test.js",
+    "db:migrate": "cd relay && ../node_modules/.bin/wrangler d1 execute clawkie --remote --file schema.sql",
+    "db:migrate:local": "cd relay && ../node_modules/.bin/wrangler d1 execute clawkie --local --file schema.sql"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "better-auth": "^1.7.11",
     "wrangler": "^4.151.1",
-    "zod": "^4.6.7",
-    "@modelcontextprotocol/sdk": "^1.32.1"
+    "zod": "^4.6.7"
   }
 }
