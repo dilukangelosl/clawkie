@@ -134,12 +134,14 @@ async function dashboardPage() {
 
   async function renderSessions() {
     const items = [{ name: 'all', label: 'All sessions', meta: `${state.sessions.filter(x => x.online).length} online` }]
-    for (const x of state.sessions) items.push({ ...x, label: x.name, meta: [await dec(x.status), await dec(x.cwd)].filter(Boolean).join(' · ') || `seen ${ago(x.seen)}` })
+    for (const x of state.sessions) items.push({ ...x, label: x.name, path: await dec(x.cwd), meta: (await dec(x.status)) || `seen ${ago(x.seen)}` })
     $('#sessions').replaceChildren(...items.map(x => {
       const btn = el('button', { className: 'sess', type: 'button', onclick: () => { selected = x.name; refresh() } },
         el('span', { className: 'dot ' + (x.name === 'all' || x.online ? 'dot-online' : 'dot-offline'), title: x.online ? 'online' : 'offline' }),
         el('b', { textContent: x.label }),
         x.name === 'all' ? el('span') : el('span', { className: 'small muted', textContent: x.online ? 'online' : ago(x.seen) }),
+        ...(x.path ? [el('span', { className: 'project', textContent: x.path.split(/[\\/]/).filter(Boolean).pop() || x.path, title: x.path }),
+          el('span', { className: 'path', textContent: '\u200E' + x.path + '\u200E', title: x.path })] : []),
         el('span', { className: 'meta', textContent: x.meta, title: x.meta }))
       btn.setAttribute('aria-current', x.name === selected)
       return el('li', {}, btn)
