@@ -164,7 +164,8 @@ assert.match(events.a.find(e => e.content.startsWith('done')).content, /\[REDACT
 
 // --- hooks: SessionStart names the session and lists peers; Stop nudges once about the unanswered request
 const start = hook(machine1, 'b', 'session-start', { cwd: '/x' })
-assert.equal(start.hookSpecificOutput.sessionTitle, bName)
+assert.equal(start.hookSpecificOutput.sessionTitle, undefined) // resume list keeps Claude Code's own title (the project)
+assert.match(start.hookSpecificOutput.additionalContext, new RegExp(`session "${bName}"`))
 assert.match(start.hookSpecificOutput.additionalContext, new RegExp(aName))
 await a.call('clawkie_send', { to: bName, text: 'also reindex please' })
 await until(() => events.b.some(e => e.content === 'also reindex please'))

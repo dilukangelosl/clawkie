@@ -1,7 +1,7 @@
 {
   "name": "clawkie",
   "displayName": "Clawkie",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A walkie-talkie for your Claude Code agents: sign in once per machine and every session on your account pairs up to pass prompts, results and status. Web dashboard at clawkie.xyz.",
   "author": {
     "name": "Diluk Angelo"

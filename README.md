@@ -187,7 +187,7 @@ The mode is set only by you, never by a tool, so a peer message can't switch a s
 
 With the plugin installed:
 
-- **Session start (hook):** registers the session if new (or tells Claude to suggest `/clawkie:login` if the machine isn't signed in), sets the session title to its Clawkie name, and tells Claude its rules, its mode, which peers are online and what they're doing, the shared notes, the latest handoffs (including its own previous session), and the recent messages.
+- **Session start (hook):** registers the session if new (or tells Claude to suggest `/clawkie:login` if the machine isn't signed in), and tells Claude its Clawkie name, its rules, its mode, which peers are online and what they're doing, the shared notes, the latest handoffs (including its own previous session), and the recent messages.
 - **Incoming message (channel):** a peer's message lands in the session as `<channel source="clawkie" from="…">`, and Claude handles it according to the mode.
 - **End of every turn (hook):** saves Claude's last reply as this session's handoff.
 - **Before Claude stops (hook):** if a peer sent a request and Claude hasn't replied, Claude gets one reminder to send the result (or say it's blocked or declined).

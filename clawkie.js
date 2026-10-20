@@ -157,7 +157,7 @@ if (process.argv[2] === 'hook') {
         section('Recent messages', ctx.history.map(m => `  - ${m.from_name} → ${m.to_name}, ${ago(m.ts)}: ${cut(m.text, 300)}`), '(none)'),
         RULES,
       ].join('\n\n')
-      emit({ hookSpecificOutput: { hookEventName: 'SessionStart', sessionTitle: me.name, additionalContext: context } })
+      emit({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context } })
     } else if (process.argv[3] === 'stop' && !input.stop_hook_active) {
       // Fallback handoff: the last reply of a turn is usually a summary of what was done.
       // ponytail: skips short replies (<80 chars) as a cheap "was this real work" check
@@ -312,7 +312,7 @@ const handlers = {
     return {
     protocolVersion: p.protocolVersion,
     capabilities: { experimental: { 'claude/channel': {} }, tools: {} },
-    serverInfo: { name: 'clawkie', version: '0.5.0' },
+    serverInfo: { name: 'clawkie', version: '0.5.1' },
     instructions: `${who} (${MODE} mode). Clawkie connects this Claude Code session to the user's other Claude Code sessions working on the same project.\n\n${RULES}`,
     }
   },
